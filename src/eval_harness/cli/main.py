@@ -28,9 +28,9 @@ def run():
     load_dotenv()
 
     backend = OpenAICompatibleBackend(
-        model_name="qwen2.5-0.5b-instruct",
+        model_name=os.getenv("MODEL_NAME"),
         api_key=os.getenv("OPENAI_API_KEY"),
-        base_url="http://localhost:1234/v1",
+        base_url=os.getenv("BASE_URL"),
     )
 
     ROOT = Path(__file__).resolve().parents[3]
