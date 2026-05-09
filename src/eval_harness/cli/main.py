@@ -4,8 +4,11 @@ import typer
 from dotenv import load_dotenv
 
 #
-from eval_harness.backends.openai_compatible import (
-    OpenAICompatibleBackend,
+# from eval_harness.backends.openai_compatible import (
+#     OpenAICompatibleBackend,
+# )
+from eval_harness.backends.hf_transformer import (
+    HFTransformerBackend,
 )
 from eval_harness.logging.mlflow_logger import (
     MLflowLogger,
@@ -27,10 +30,13 @@ app = typer.Typer(no_args_is_help=True)
 def run():
     load_dotenv()
 
-    backend = OpenAICompatibleBackend(
+    # backend = OpenAICompatibleBackend(
+    #     model_name=os.getenv("MODEL_NAME"),
+    #     api_key=os.getenv("OPENAI_API_KEY"),
+    #     base_url=os.getenv("BASE_URL"),
+    # )
+    backend = HFTransformerBackend(
         model_name=os.getenv("MODEL_NAME"),
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("BASE_URL"),
     )
 
     ROOT = Path(__file__).resolve().parents[3]

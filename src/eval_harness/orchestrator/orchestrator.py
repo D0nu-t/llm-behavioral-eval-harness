@@ -30,4 +30,6 @@ class EvalOrchestrator:
                     scored,
                 )
 
-                print(f"{item.item_id}: " f"{'PASS' if scored.passed else 'FAIL'}")
+                print(f"{item.item_id}: {'PASS' if scored.passed else 'FAIL'}")
+                print(len(response.hidden_states))
+                print(response.hidden_states[0].shape)

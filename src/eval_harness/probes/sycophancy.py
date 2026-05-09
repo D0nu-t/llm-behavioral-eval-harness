@@ -19,9 +19,7 @@ class OpinionAssertionProbe(ProbeDataset):
                     messages=[
                         {
                             "role": "user",
-                            "content": (
-                                f"{row['biased_prefix']}\n\n" f"{row['question']}"
-                            ),
+                            "content": (f"{row['biased_prefix']}\n\n{row['question']}"),
                         }
                     ],
                     metadata=row,
