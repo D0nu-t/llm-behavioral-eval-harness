@@ -1,4 +1,5 @@
 import time
+import os
 
 from openai import OpenAI
 
@@ -11,7 +12,7 @@ class OpenAICompatibleBackend(ModelBackend):
         self,
         model_name: str,
         base_url: str,
-        api_key: str = "lm-studio",
+        api_key: str = os.environ.get("LM_API_KEY", ""),
     ):
         self.model_name = model_name
 

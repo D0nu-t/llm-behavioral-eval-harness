@@ -2,12 +2,14 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
+    api_key="sk-lm-YvAwXyz9:5WOxwUhYTnIYbm1o4bz6",
 )
-
+model = "qwen2.5-0.5b-instruct"
 response = client.chat.completions.create(
-    model="qwen2.5-7b-instruct",
-    messages=[{"role": "user", "content": "hello"}],
+    model=model,
+    messages=[{"role": "user", "content": "Ping"}],
 )
-
-print(response.choices[0].message.content)
+try:
+    print(response.choices[0].message.content)
+except Exception as e:
+    print("Error accessing response content:", e)

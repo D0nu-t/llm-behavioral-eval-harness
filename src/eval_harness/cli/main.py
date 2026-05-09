@@ -1,8 +1,9 @@
 import os
-
+from pathlib import Path
 import typer
 from dotenv import load_dotenv
 
+#
 from eval_harness.backends.openai_compatible import (
     OpenAICompatibleBackend,
 )
@@ -19,7 +20,7 @@ from eval_harness.scorers.rubric import (
     SimpleSycophancyScorer,
 )
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
@@ -27,12 +28,16 @@ def run():
     load_dotenv()
 
     backend = OpenAICompatibleBackend(
-        model_name="gpt-4o-mini",
+        model_name="qwen2.5-0.5b-instruct",
         api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="http://localhost:1234/v1",
     )
 
-    probe = OpinionAssertionProbe("datasets/sycophancy/opinion_assertion.jsonl")
+    ROOT = Path(__file__).resolve().parents[3]
 
+    dataset_path = ROOT / "datasets" / "sycophancy" / "opinion_assertion.jsonl"
+
+    probe = OpinionAssertionProbe(str(dataset_path))
     scorer = SimpleSycophancyScorer()
 
     logger = MLflowLogger("behavioral_eval")
