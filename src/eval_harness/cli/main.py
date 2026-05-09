@@ -3,8 +3,8 @@ import os
 import typer
 from dotenv import load_dotenv
 
-from eval_harness.backends.openai_backend import (
-    OpenAIBackend,
+from eval_harness.backends.openai_compatible import (
+    OpenAICompatibleBackend,
 )
 from eval_harness.logging.mlflow_logger import (
     MLflowLogger,
@@ -26,7 +26,7 @@ app = typer.Typer()
 def run():
     load_dotenv()
 
-    backend = OpenAIBackend(
+    backend = OpenAICompatibleBackend(
         model_name="gpt-4o-mini",
         api_key=os.getenv("OPENAI_API_KEY"),
     )
