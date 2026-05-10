@@ -4,6 +4,17 @@ import plotly.graph_objects as go
 import streamlit as st
 import torch
 from streamlit_autorefresh import st_autorefresh
+from pathlib import Path
+_DUMP_PATH = Path(__file__).resolve().parents[3] / "activation_dump.json"
+
+try:
+    with open(_DUMP_PATH, "r") as f:
+        activations = json.load(f)
+except FileNotFoundError:
+    activations = None
+except json.JSONDecodeError:
+    st.warning("Activation file mid-write, retrying...")
+    st.stop()
 
 st.set_page_config(layout="wide")
 st_autorefresh(interval=1000, key="refresh")
@@ -26,7 +37,7 @@ def activation_norm_plot(norms):
 # Read the file first, then branch on the result.
 activations = None
 try:
-    with open("activation_dump.json", "r") as f:
+    with open(_DUMP_PATH, "r") as f:
         activations = json.load(f)
 except FileNotFoundError:
     pass

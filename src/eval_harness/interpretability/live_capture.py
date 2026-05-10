@@ -1,49 +1,50 @@
 """
 interpretability/live_capture.py
 
-Registers forward hooks on transformer layers and writes activations to
-activation_dump.json ONCE per forward pass — not per layer.
+Forward hooks + atomic activation persistence.
 
-BUG THAT WAS HERE: save_activations() was called inside every hook
-invocation. With N layers this caused N partial writes per forward pass.
-Any concurrent reader (the Streamlit dashboard) could open the file between
-writes and see an incomplete dict. The file also appeared to "wipe" because
-each write starts from the current LIVE_ACTIVATIONS state which grows
-incrementally during the pass.
-
-FIX: hooks only mutate LIVE_ACTIVATIONS in memory. The orchestrator calls
-save_activations() once after each complete forward pass.
+Path is anchored to the project root via __file__ resolution so both the
+CLI process and the Streamlit dashboard process always agree on the location,
+regardless of which directory each was launched from.
 """
 
 import json
+import os
+from pathlib import Path
+
 import torch
 
 from eval_harness.dashboard.state import LIVE_ACTIVATIONS
 
+# parents: [0]=interpretability [1]=eval_harness [2]=src [3]=project_root
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DEFAULT_DUMP = _PROJECT_ROOT / "activation_dump.json"
 
-def save_activations(path: str = "activation_dump.json") -> None:
-    """Write LIVE_ACTIVATIONS to disk atomically via a .tmp swap."""
+
+def save_activations(path: Path | None = None) -> None:
+    """Atomic write via .tmp rename. Call once post-generate(), not per hook."""
+    target = Path(path) if path else _DEFAULT_DUMP
     serializable = {k: v.tolist() for k, v in LIVE_ACTIVATIONS.items()}
-    tmp = path + ".tmp"
+    tmp = str(target) + ".tmp"
     with open(tmp, "w") as f:
         json.dump(serializable, f)
         f.flush()
-    # Atomic rename — reader never sees a partial file
-    import os
-    os.replace(tmp, path)
+    os.replace(tmp, str(target))
+
+
+def clear_activations() -> None:
+    """Reset in-memory store between probe items."""
+    LIVE_ACTIVATIONS.clear()
 
 
 def make_hook(name: str):
     """
-    Returns a forward hook that captures the final-token hidden state.
-    Does NOT write to disk — call save_activations() after the full
-    forward pass completes.
+    Forward hook storing final-token hidden state as [1, hidden_dim].
+    Does NOT write to disk — caller must call save_activations() after pass.
     """
     def hook(module, inputs, outputs):
         tensor = outputs[0] if isinstance(outputs, tuple) else outputs
         if not isinstance(tensor, torch.Tensor):
             return
-        # tensor shape: [batch, seq_len, hidden_dim]
-        # keep final token, detach from graph
         LIVE_ACTIVATIONS[name] = tensor[:, -1, :].detach().cpu()
     return hook
