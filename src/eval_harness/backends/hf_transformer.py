@@ -8,6 +8,9 @@ from transformers import (
 )
 
 from eval_harness.backends.base import ModelBackend
+from eval_harness.interpretability.live_capture import (
+    make_hook,
+)
 
 
 @dataclass
@@ -42,6 +45,8 @@ class HFTransformerBackend(ModelBackend):
 
         self.model.eval()
         print("MODEL LOADED")
+        for i, block in enumerate(self.model.transformer.h):
+            block.register_forward_hook(make_hook(f"layer_{i}"))
 
     def complete(
         self,
