@@ -45,11 +45,11 @@ def _build_orchestrator():
     from eval_harness.probes.sycophancy import OpinionAssertionProbe
     from eval_harness.scorers.rubric import SimpleSycophancyScorer
     class HFTransformerBackendWithModelName(HFTransformerBackend):
-        @property
         def model_name(self) -> str:
             return self.model.config._name_or_path
+
     return EvalOrchestrator(
-        backend=HFTransformerBackend(
+        HFTransformerBackendWithModelName=HFTransformerBackendWithModelName(
             model_name=os.getenv("MODEL_NAME", "sshleifer/tiny-gpt2")
         ),
         probe=OpinionAssertionProbe(str(DATASET_PATH)),
