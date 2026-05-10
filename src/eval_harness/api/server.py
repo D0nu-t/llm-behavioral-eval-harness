@@ -62,23 +62,33 @@ def _run_blocking():
     """
     try:
         orchestrator = _build_orchestrator()
+        model_name = os.getenv("MODEL_NAME", "sshleifer/tiny-gpt2")
+
         for result in orchestrator.run():
+            result["model_name"] = model_name
             yield f"data: {json.dumps(result)}\n\n"
     except Exception as exc:
         yield f"data: {json.dumps({'error': str(exc)})}\n\n"
     finally:
         yield 'data: {"done": true}\n\n'
 
-
 async def _sse_generator():
     loop = asyncio.get_event_loop()
     gen = _run_blocking()
-    while True:
+
+    def _next_chunk():
         try:
-            chunk = await loop.run_in_executor(_executor, next, gen)
-            yield chunk
+            return next(gen)
         except StopIteration:
+            return None
+
+    while True:
+        chunk = await loop.run_in_executor(_executor, _next_chunk)
+
+        if chunk is None:
             break
+
+        yield chunk
 
 
 @app.get("/run/stream")
@@ -315,6 +325,9 @@ function startRun() {
   es.onopen = () => setStatus('streaming…', 'pulsing');
   es.onmessage = e => {
     let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (d.model_name) {
+  document.getElementById('modelName').textContent = d.model_name;
+}
     if (d.done) {
       es.close(); es = null;
       document.getElementById('runBtn').disabled = false;
@@ -339,7 +352,7 @@ function startRun() {
 }
 
 initCharts();
-</scrip>
+</script>
 </body>
 </html>"""
 
