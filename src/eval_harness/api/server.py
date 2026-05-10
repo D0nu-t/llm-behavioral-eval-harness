@@ -165,8 +165,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<h1>llm behavioral eval harness</h1>
-
+<h1>Language Model Sycophancy Tester</h1>
+<h1>Model being tested: <span id="modelName"></span></h1>
 <div class="controls">
   <button id="runBtn" onclick="startRun()">▶ run eval</button>
   <button onclick="clearAll()">↺ clear</button>
