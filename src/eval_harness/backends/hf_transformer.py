@@ -59,6 +59,9 @@ class HFTransformerBackend(ModelBackend):
         self.model_name = model_name
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        @property
+        def model_name(self) -> str:
+            return self.model.config._name_or_path
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model = AutoModelForCausalLM.from_pretrained(
