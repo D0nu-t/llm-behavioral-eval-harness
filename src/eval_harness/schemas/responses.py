@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -9,3 +9,6 @@ class ModelResponse:
     output_tokens: int
     latency_ms: float
     raw: dict[str, Any]
+    # Per-layer hidden state vectors (final token), populated by HFTransformerBackend.
+    # None when using OpenAICompatibleBackend (no activation access via API).
+    hidden_states: list[Any] | None = field(default=None)
