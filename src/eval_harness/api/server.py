@@ -33,8 +33,6 @@ app.add_middleware(
 )
 
 _executor = ThreadPoolExecutor(max_workers=1)
-ROOT = Path(__file__).resolve().parents[4]
-# DATASET_PATH = ROOT / "datasets" / "sycophancy" / "opinion_assertion.jsonl"
 DATASET_PATH = Path("C:/Users/donut/coding_projects/llm-behavioral-eval-harness/datasets/sycophancy/opinion_assertion.jsonl")
 
 
@@ -44,12 +42,9 @@ def _build_orchestrator():
     from eval_harness.orchestrator.orchestrator import EvalOrchestrator
     from eval_harness.probes.sycophancy import OpinionAssertionProbe
     from eval_harness.scorers.rubric import SimpleSycophancyScorer
-    class HFTransformerBackendWithModelName(HFTransformerBackend):
-        def model_name(self) -> str:
-            return self.model.config._name_or_path
 
     return EvalOrchestrator(
-        HFTransformerBackendWithModelName=HFTransformerBackendWithModelName(
+        backend=HFTransformerBackend(
             model_name=os.getenv("MODEL_NAME", "sshleifer/tiny-gpt2")
         ),
         probe=OpinionAssertionProbe(str(DATASET_PATH)),
@@ -60,20 +55,18 @@ def _build_orchestrator():
 
 def _run_blocking():
     """
-    Synchronous generator consumed by the async SSE wrapper.
-    Runs in a thread pool so model inference does not block the event loop.
+    Synchronous generator. Runs in thread pool so inference does not block
+    the event loop. Yields SSE-formatted strings.
     """
     try:
         orchestrator = _build_orchestrator()
-        model_name = os.getenv("MODEL_NAME", "sshleifer/tiny-gpt2")
-
         for result in orchestrator.run():
-            result["model_name"] = model_name
             yield f"data: {json.dumps(result)}\n\n"
     except Exception as exc:
         yield f"data: {json.dumps({'error': str(exc)})}\n\n"
     finally:
         yield 'data: {"done": true}\n\n'
+
 
 async def _sse_generator():
     loop = asyncio.get_event_loop()
@@ -87,21 +80,13 @@ async def _sse_generator():
 
     while True:
         chunk = await loop.run_in_executor(_executor, _next_chunk)
-
         if chunk is None:
             break
-
         yield chunk
 
 
 @app.get("/run/stream")
 async def stream_eval():
-    """
-    SSE endpoint. Connect with EventSource('/run/stream').
-    Emits one JSON object per probe item, then {"done": true}.
-    Fields: item_id, score, passed, reasoning, response_text,
-            latency_ms, input_tokens, output_tokens, drift_per_layer.
-    """
     return StreamingResponse(
         _sse_generator(),
         media_type="text/event-stream",
@@ -113,11 +98,6 @@ async def stream_eval():
 async def health():
     return {"status": "ok", "dataset_exists": DATASET_PATH.exists()}
 
-
-# ---------------------------------------------------------------------------
-# Inline dashboard — zero extra dependencies, no separate dev server.
-# EventSource connects to /run/stream on the same origin (no CORS needed).
-# ---------------------------------------------------------------------------
 
 _DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -131,7 +111,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   body { font-family: ui-monospace, 'Cascadia Code', monospace;
          background: #0f0f0f; color: #e0e0e0; padding: 1.5rem; }
   h1   { font-size: 1rem; font-weight: 500; color: #fff;
-         letter-spacing: -.01em; margin-bottom: 1.25rem; }
+         letter-spacing: -.01em; margin-bottom: .25rem; }
+  .subtitle { font-size: 11px; color: #555; margin-bottom: 1.25rem; }
   .controls { display: flex; gap: 8px; margin-bottom: 1.25rem; }
   button { font-family: inherit; font-size: 12px; padding: 6px 14px;
            background: #1e1e1e; border: 1px solid #333; color: #e0e0e0;
@@ -179,10 +160,11 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <h1>language model sycophancy tester</h1>
-<h1>model being tested: <span id="modelName"></span></h1>
+<div class="subtitle">model: <span id="modelName">—</span></div>
+
 <div class="controls">
-  <button id="runBtn" onclick="startRun()">▶ run eval</button>
-  <button onclick="clearAll()">↺ clear</button>
+  <button id="runBtn" onclick="startRun()">&#9654; run eval</button>
+  <button onclick="clearAll()">&#8635; clear</button>
 </div>
 
 <div class="metrics">
@@ -250,7 +232,10 @@ function initCharts() {
   scoreChart = new Chart(document.getElementById('scoreChart'), {
     type: 'bar',
     data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 3 }] },
-    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0, max: 1 } } }
+    options: {
+      ...chartDefaults,
+      scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0, max: 1 } }
+    }
   });
 
   driftChart = new Chart(document.getElementById('driftChart'), {
@@ -258,7 +243,10 @@ function initCharts() {
     data: { labels: [], datasets: [{ data: [],
       borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)',
       fill: true, tension: 0.3, pointRadius: 4 }] },
-    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0 } } }
+    options: {
+      ...chartDefaults,
+      scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0 } }
+    }
   });
 }
 
@@ -270,10 +258,11 @@ function setStatus(txt, cls) {
 
 function updateMetrics() {
   const n = results.length, p = results.filter(r => r.passed).length;
-  const driftVals = results.filter(r => r.drift_per_layer)
-    .map(r => r.drift_per_layer.reduce((a,b)=>a+b,0) / r.drift_per_layer.length);
+  const driftVals = results
+    .filter(r => r.drift_per_layer)
+    .map(r => r.drift_per_layer.reduce((a, b) => a + b, 0) / r.drift_per_layer.length);
   const meanDrift = driftVals.length
-    ? (driftVals.reduce((a,b)=>a+b,0) / driftVals.length).toFixed(4) : '—';
+    ? (driftVals.reduce((a, b) => a + b, 0) / driftVals.length).toFixed(4) : '—';
   document.getElementById('mTotal').textContent = n || '—';
   document.getElementById('mPass').textContent  = n ? p : '—';
   document.getElementById('mFail').textContent  = n ? n - p : '—';
@@ -282,13 +271,13 @@ function updateMetrics() {
 
 function updateCharts(r) {
   scoreChart.data.labels.push(r.item_id);
-  scoreChart.data.datasets[0].data.push(r.score);
+  scoreChart.data.datasets[0].data.push(r.score ?? 0);
   scoreChart.data.datasets[0].backgroundColor =
     scoreChart.data.datasets[0].data.map(s => s >= 1 ? '#4ade80' : '#f87171');
   scoreChart.update('none');
 
   if (r.drift_per_layer) {
-    driftChart.data.labels = r.drift_per_layer.map((_,i) => `L${i}`);
+    driftChart.data.labels = r.drift_per_layer.map((_, i) => 'L' + i);
     driftChart.data.datasets[0].data = r.drift_per_layer;
     driftChart.update('none');
   }
@@ -296,16 +285,16 @@ function updateCharts(r) {
 
 function appendRow(r) {
   const drift = r.drift_per_layer
-    ? (r.drift_per_layer.reduce((a,b)=>a+b,0)/r.drift_per_layer.length).toFixed(4) : '—';
+    ? (r.drift_per_layer.reduce((a, b) => a + b, 0) / r.drift_per_layer.length).toFixed(4)
+    : '—';
   const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>${r.item_id}</td>
-    <td><span class="badge ${r.passed?'pass':'fail'}">${r.passed?'PASS':'FAIL'}</span></td>
-    <td>${r.score !== undefined ? r.score.toFixed(1) : '—'}</td>
-    <td>${drift}</td>
-    <td>${r.latency_ms != null ? r.latency_ms+'ms' : '—'}</td>
-    <td class="resp" title="${(r.response_text||'').replace(/"/g,'&quot;')}">${(r.response_text||r.error||'').slice(0,80)}</td>
-  `;
+  tr.innerHTML =
+    '<td>' + r.item_id + '</td>' +
+    '<td><span class="badge ' + (r.passed ? 'pass' : 'fail') + '">' + (r.passed ? 'PASS' : 'FAIL') + '</span></td>' +
+    '<td>' + (r.score !== undefined ? r.score.toFixed(1) : '—') + '</td>' +
+    '<td>' + drift + '</td>' +
+    '<td>' + (r.latency_ms != null ? r.latency_ms + 'ms' : '—') + '</td>' +
+    '<td class="resp">' + (r.response_text || r.error || '').slice(0, 80) + '</td>';
   document.getElementById('tbody').appendChild(tr);
 }
 
@@ -314,9 +303,15 @@ function clearAll() {
   results = [];
   document.getElementById('tbody').innerHTML = '';
   document.getElementById('errMsg').textContent = '';
-  scoreChart.data.labels = []; scoreChart.data.datasets[0].data = []; scoreChart.update('none');
-  driftChart.data.labels = []; driftChart.data.datasets[0].data = []; driftChart.update('none');
-  updateMetrics(); setStatus('');
+  document.getElementById('modelName').textContent = '—';
+  scoreChart.data.labels = [];
+  scoreChart.data.datasets[0].data = [];
+  scoreChart.update('none');
+  driftChart.data.labels = [];
+  driftChart.data.datasets[0].data = [];
+  driftChart.update('none');
+  updateMetrics();
+  setStatus('');
   document.getElementById('runBtn').disabled = false;
 }
 
@@ -324,32 +319,43 @@ function startRun() {
   clearAll();
   document.getElementById('runBtn').disabled = true;
   setStatus('connecting…', 'pulsing');
+
   es = new EventSource('/run/stream');
   es.onopen = () => setStatus('streaming…', 'pulsing');
+
   es.onmessage = e => {
-    let d; try { d = JSON.parse(e.data); } catch { return; }
+    let d;
+    try { d = JSON.parse(e.data); } catch { return; }
+
     if (d.model_name) {
-  document.getElementById('modelName').textContent = d.model_name;
-}
+      document.getElementById('modelName').textContent = d.model_name;
+    }
     if (d.done) {
       es.close(); es = null;
       document.getElementById('runBtn').disabled = false;
-      setStatus(`complete — ${results.length} items`, 'dot-done');
+      setStatus('complete — ' + results.length + ' items', 'dot-done');
       return;
     }
     if (d.error) {
       document.getElementById('errMsg').textContent = 'Error: ' + d.error;
       es.close(); es = null;
       document.getElementById('runBtn').disabled = false;
-      setStatus(''); return;
+      setStatus('');
+      return;
     }
-    results.push(d); appendRow(d); updateMetrics(); updateCharts(d);
-    setStatus(`streaming… ${results.length} received`, 'pulsing');
+
+    results.push(d);
+    appendRow(d);
+    updateMetrics();
+    updateCharts(d);
+    setStatus('streaming… ' + results.length + ' received', 'pulsing');
   };
+
   es.onerror = () => {
     es.close(); es = null;
     document.getElementById('runBtn').disabled = false;
-    document.getElementById('errMsg').textContent = 'Connection failed — is the server running?';
+    document.getElementById('errMsg').textContent =
+      'Connection failed — is the server running?';
     setStatus('');
   };
 }
