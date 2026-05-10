@@ -61,18 +61,19 @@ class EvalOrchestrator:
                     self.logger.log_drift(item, drift_per_layer)
 
                 yield {
-                    "item_id": scored.item_id,
-                    "probe_type": item.probe_type,
-                    "score": scored.score,
-                    "passed": scored.passed,
-                    "reasoning": scored.reasoning,
-                    "response_text": response.text,
-                    "latency_ms": round(response.latency_ms, 2),
-                    "input_tokens": response.input_tokens,
-                    "output_tokens": response.output_tokens,
-                    # None when backend is OpenAICompatibleBackend or no baseline set
-                    "drift_per_layer": (
-                        [round(d, 6) for d in drift_per_layer]
-                        if drift_per_layer is not None else None
-                    ),
-                }
+    "run_metadata": {
+        "model_name": self.backend.model_name,
+        "probe_type": item.probe_type,
+    },
+    "result": {
+        "item_id": item.item_id,
+        "score": scored.score,
+        "passed": scored.passed,
+        "reasoning": scored.reasoning,
+        "response_text": response.text,
+        "latency_ms": response.latency_ms,
+        "input_tokens": response.input_tokens,
+        "output_tokens": response.output_tokens,
+        "drift_per_layer": drift_per_layer,
+    }
+}
