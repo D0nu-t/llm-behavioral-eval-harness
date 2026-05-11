@@ -11,12 +11,14 @@ class MLflowLogger:
 
     def log_metrics(self, item, metrics: dict[str, list[float]]):
         """
-        Log all layerwise metrics from full_layerwise_metrics() output.
-        metrics keys: cosine_drift, norm_ratio, effective_rank.
-        Logs per-layer values and a mean summary for each metric type.
+        Log all layerwise metrics from full_layerwise_metrics().
+        Keys: cosine_drift, norm_ratio, effective_rank.
+        Logs per-layer scalars and a mean summary for each type.
         """
         for metric_name, values in metrics.items():
             for i, v in enumerate(values):
                 mlflow.log_metric(f"{item.item_id}_{metric_name}_L{i}", v)
-            mean = sum(values) / len(values)
-            mlflow.log_metric(f"{item.item_id}_mean_{metric_name}", mean)
+            mlflow.log_metric(
+                f"{item.item_id}_mean_{metric_name}",
+                sum(values) / len(values),
+            )

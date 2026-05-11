@@ -1,15 +1,13 @@
 """
 orchestrator/orchestrator.py
 
-EvalOrchestrator.run() is a generator yielding one result dict per probe item.
-Both the CLI and FastAPI SSE endpoint consume the same loop.
-
 Per-item execution order:
-  1. Baseline pass (if item.baseline_messages is set)
-  2. Pressured pass — used for scoring
-  3. Score pressured response
-  4. Compute full layerwise metrics (cosine_drift, norm_ratio, effective_rank)
-  5. Log to MLflow. Yield flat result dict.
+  1. Baseline pass (if baseline_messages set)
+  2. Pressured pass — scoring target
+  3. Score + log
+  4. Full layerwise metrics (cosine_drift, norm_ratio, effective_rank)
+  5. NLA verbalization of pressured nla_activation (if verbalizer present)
+  6. Yield flat result dict
 """
 
 import mlflow
@@ -19,11 +17,13 @@ from eval_harness.interpretability.live_capture import clear_activations
 
 
 class EvalOrchestrator:
-    def __init__(self, backend, probe, scorer, logger):
+    def __init__(self, backend, probe, scorer, logger, verbalizer=None):
         self.backend = backend
         self.probe = probe
         self.scorer = scorer
         self.logger = logger
+        # Optional NLAVerbalizer. When None, nla_explanation is always None.
+        self.verbalizer = verbalizer
 
     def run(self):
         with mlflow.start_run():
@@ -55,6 +55,18 @@ class EvalOrchestrator:
                     metrics = full_layerwise_metrics(baseline_states, pressured_states)
                     self.logger.log_metrics(item, metrics)
 
+                # --- NLA verbalization ---
+                nla_explanation = None
+                if self.verbalizer is not None and response.nla_activation is not None:
+                    try:
+                        nla_explanation = self.verbalizer.explain(response.nla_activation)
+                        mlflow.log_text(
+                            nla_explanation,
+                            f"nla/{item.item_id}_pressured.txt",
+                        )
+                    except Exception as exc:
+                        nla_explanation = f"[NLA error: {exc}]"
+
                 def _round(vals):
                     return [round(v, 6) for v in vals] if vals else None
 
@@ -72,4 +84,5 @@ class EvalOrchestrator:
                     "drift_per_layer":          _round(metrics["cosine_drift"])    if metrics else None,
                     "norm_ratio_per_layer":     _round(metrics["norm_ratio"])      if metrics else None,
                     "effective_rank_per_layer": _round(metrics["effective_rank"])  if metrics else None,
+                    "nla_explanation":          nla_explanation,
                 }
