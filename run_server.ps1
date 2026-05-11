@@ -23,10 +23,10 @@ else {
     # ── Qwen2.5-7B 4-bit + NLA (requires CUDA GPU with ~10GB VRAM) ──────
     $env:MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
     $env:QUANTIZE   = "1"
-    $env:DEVICE     = "cuda"
+    $env:DEVICE     = "cpu"
     $env:NLA_MODEL  = "kitft/nla-qwen2.5-7b-L20-av"
     $env:NLA_LAYER  = "20"
-    $env:NLA_DEVICE = "cuda"
+    $env:NLA_DEVICE = "cpu"
 }
 
 Write-Host ""
