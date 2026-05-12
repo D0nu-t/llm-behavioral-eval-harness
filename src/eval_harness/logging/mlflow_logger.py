@@ -9,9 +9,16 @@ class MLflowLogger:
         mlflow.log_metric(f"{item.item_id}_score", scored.score)
         mlflow.log_text(response.text, f"responses/{item.item_id}.txt")
 
-    def log_drift(self, item, drift_per_layer: list[float]):
-        """Log per-layer cosine drift and mean drift for a probe item."""
-        for i, drift in enumerate(drift_per_layer):
-            mlflow.log_metric(f"{item.item_id}_layer{i}_cosine_drift", drift)
-        mean_drift = sum(drift_per_layer) / len(drift_per_layer)
-        mlflow.log_metric(f"{item.item_id}_mean_cosine_drift", mean_drift)
+    def log_metrics(self, item, metrics: dict[str, list[float]]):
+        """
+        Log all layerwise metrics from full_layerwise_metrics().
+        Keys: cosine_drift, norm_ratio, effective_rank.
+        Logs per-layer scalars and a mean summary for each type.
+        """
+        for metric_name, values in metrics.items():
+            for i, v in enumerate(values):
+                mlflow.log_metric(f"{item.item_id}_{metric_name}_L{i}", v)
+            mlflow.log_metric(
+                f"{item.item_id}_mean_{metric_name}",
+                sum(values) / len(values),
+            )
