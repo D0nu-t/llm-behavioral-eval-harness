@@ -8,7 +8,7 @@
 #   $env:MODEL_NAME = "sshleifer/tiny-gpt2"; .\run_server.ps1
 
 param(
-    [string]$Mode = "qwen"   # "qwen" or "tiny" (for local CPU testing)
+    [string]$Mode = "tiny"   # "qwen" or "tiny" (for local CPU testing)
 )
 
 if ($Mode -eq "tiny") {
@@ -22,7 +22,7 @@ if ($Mode -eq "tiny") {
 else {
     # ── Qwen2.5-7B 4-bit + NLA (requires CUDA GPU with ~10GB VRAM) ──────
     $env:MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
-    $env:QUANTIZE   = "1"
+    $env:QUANTIZE   = "0"
     $env:DEVICE     = "cpu"
     $env:NLA_MODEL  = "kitft/nla-qwen2.5-7b-L20-av"
     $env:NLA_LAYER  = "20"

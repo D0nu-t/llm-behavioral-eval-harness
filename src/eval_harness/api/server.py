@@ -23,7 +23,7 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-
+from eval_harness.probes.registry import PROBE_REGISTRY
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,7 +66,15 @@ def _build_orchestrator():
         quantize=use_quant,
         nla_layer=nla_layer,
     )
+    probe_suite = []
 
+    for probe_name, probe_cls in PROBE_REGISTRY.items():
+        dataset_path = DATASET_ROOT / probe_name
+
+        if not dataset_path.exists():
+            continue
+
+        probe_suite.append(probe_cls(str(dataset_path)))
     # NLA verbalizer — optional, loaded only when env vars set
     verbalizer = None
     nla_model = os.getenv("NLA_MODEL")
@@ -80,7 +88,7 @@ def _build_orchestrator():
 
     return EvalOrchestrator(
         backend=backend,
-        probe=OpinionAssertionProbe(str(DATASET_PATH)),
+        probe=CompositeProbe(probe_suite),
         scorer=SimpleSycophancyScorer(),
         logger=MLflowLogger("behavioral_eval"),
         verbalizer=verbalizer,
